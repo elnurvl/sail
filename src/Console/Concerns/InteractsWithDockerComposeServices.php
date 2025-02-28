@@ -2,39 +2,12 @@
 
 namespace Laravel\Sail\Console\Concerns;
 
+use Laravel\Sail\Sail;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Yaml\Yaml;
 
 trait InteractsWithDockerComposeServices
 {
-    /**
-     * The available services that may be installed.
-     *
-     * @var array<string>
-     */
-    protected $services = [
-        'mysql',
-        'pgsql',
-        'mariadb',
-        'mongodb',
-        'redis',
-        'valkey',
-        'memcached',
-        'meilisearch',
-        'typesense',
-        'minio',
-        'mailpit',
-        'selenium',
-        'soketi',
-    ];
-
-    /**
-     * The default services used when the user chooses non-interactive mode.
-     *
-     * @var string[]
-     */
-    protected $defaultServices = ['mysql', 'redis', 'selenium', 'mailpit'];
-
     /**
      * Gather the desired Sail services using an interactive prompt.
      *
@@ -42,15 +15,17 @@ trait InteractsWithDockerComposeServices
      */
     protected function gatherServicesInteractively()
     {
+        $services = Sail::availableServices();
+
         if (function_exists('\Laravel\Prompts\multiselect')) {
             return \Laravel\Prompts\multiselect(
                 label: 'Which services would you like to install?',
-                options: $this->services,
+                options: $services,
                 default: ['mysql'],
             );
         }
 
-        return $this->choice('Which services would you like to install?', $this->services, 0, null, true);
+        return $this->choice('Which services would you like to install?', $services, 0, null, true);
     }
 
     /**
@@ -88,13 +63,18 @@ trait InteractsWithDockerComposeServices
             ->filter(function ($service) use ($compose) {
                 return ! array_key_exists($service, $compose['services'] ?? []);
             })->each(function ($service) use (&$compose) {
-                $compose['services'][$service] = Yaml::parseFile(__DIR__ . "/../../../stubs/{$service}.stub")[$service];
+                $stubPath = Sail::stub($service);
+                if (file_exists($stubPath)) {
+                    $compose['services'][$service] = Yaml::parseFile($stubPath)[$service];
+                } else {
+                    $this->warn("No stub found for service [{$service}]. Skipping.");
+                }
             });
 
         // Merge volumes...
         collect($services)
             ->filter(function ($service) {
-                return in_array($service, ['mysql', 'pgsql', 'mariadb', 'mongodb', 'redis', 'valkey', 'meilisearch', 'typesense', 'minio']);
+                return Sail::isPersistent($service);
             })->filter(function ($service) use ($compose) {
                 return ! array_key_exists($service, $compose['volumes'] ?? []);
             })->each(function ($service) use (&$compose) {
@@ -142,7 +122,7 @@ trait InteractsWithDockerComposeServices
         if (in_array('mysql', $services)) {
             $environment = preg_replace('/DB_CONNECTION=.*/', 'DB_CONNECTION=mysql', $environment);
             $environment = str_replace('DB_HOST=127.0.0.1', "DB_HOST=mysql", $environment);
-        }elseif (in_array('pgsql', $services)) {
+        } elseif (in_array('pgsql', $services)) {
             $environment = preg_replace('/DB_CONNECTION=.*/', 'DB_CONNECTION=pgsql', $environment);
             $environment = str_replace('DB_HOST=127.0.0.1', "DB_HOST=pgsql", $environment);
             $environment = str_replace('DB_PORT=3306', "DB_PORT=5432", $environment);
@@ -165,7 +145,7 @@ trait InteractsWithDockerComposeServices
             $environment = str_replace('REDIS_HOST=127.0.0.1', 'REDIS_HOST=redis', $environment);
         }
 
-        if (in_array('valkey',$services)){
+        if (in_array('valkey', $services)) {
             $environment = str_replace('REDIS_HOST=127.0.0.1', 'REDIS_HOST=valkey', $environment);
         }
 
