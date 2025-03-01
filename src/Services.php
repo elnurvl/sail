@@ -10,7 +10,7 @@ class Services
     /**
      * The services registered with their stubs, persistence, and hooks.
      *
-     * @var array<int|string, string|array{stub: ?string, persistent: ?bool, default: ?bool, after_install: ?Closure}>
+     * @var array<int|string, string|array{stub: ?string, persistent: ?bool, default: ?bool, configuring_env: ?Closure, after_install: ?Closure}>
      */
     protected array $services = [
         'mysql' => [
@@ -52,6 +52,103 @@ class Services
         'soketi',
     ];
 
+    public function __construct()
+    {
+        $uncommentDbVars = function (string $environment): string {
+            $defaults = [
+                '# DB_HOST=127.0.0.1',
+                '# DB_PORT=3306',
+                '# DB_DATABASE=laravel',
+                '# DB_USERNAME=root',
+                '# DB_PASSWORD=',
+            ];
+            foreach ($defaults as $default) {
+                $environment = str_replace($default, substr($default, 2), $environment);
+            }
+            return $environment;
+        };
+
+        $setDbCredentials = function (string $environment): string {
+            $environment = str_replace('DB_USERNAME=root', "DB_USERNAME=sail", $environment);
+            return preg_replace("/DB_PASSWORD=(.*)/", "DB_PASSWORD=password", $environment);
+        };
+
+        $this->services['mysql']['configuring_env'] = function (string $environment) use ($uncommentDbVars, $setDbCredentials): string {
+            $environment = $uncommentDbVars($environment);
+            $environment = preg_replace('/DB_CONNECTION=.*/', 'DB_CONNECTION=mysql', $environment);
+            $environment = str_replace('DB_HOST=127.0.0.1', "DB_HOST=mysql", $environment);
+            return $setDbCredentials($environment);
+        };
+
+        $this->services['pgsql']['configuring_env'] = function (string $environment) use ($uncommentDbVars, $setDbCredentials): string {
+            $environment = $uncommentDbVars($environment);
+            $environment = preg_replace('/DB_CONNECTION=.*/', 'DB_CONNECTION=pgsql', $environment);
+            $environment = str_replace('DB_HOST=127.0.0.1', "DB_HOST=pgsql", $environment);
+            $environment = str_replace('DB_PORT=3306', "DB_PORT=5432", $environment);
+            return $setDbCredentials($environment);
+        };
+
+        $this->services['mariadb']['configuring_env'] = function (string $environment) use ($uncommentDbVars, $setDbCredentials): string {
+            $environment = $uncommentDbVars($environment);
+            if (config()->has('database.connections.mariadb')) {
+                $environment = preg_replace('/DB_CONNECTION=.*/', 'DB_CONNECTION=mariadb', $environment);
+            }
+            $environment = str_replace('DB_HOST=127.0.0.1', "DB_HOST=mariadb", $environment);
+            return $setDbCredentials($environment);
+        };
+
+        $this->services['mongodb']['configuring_env'] = function (string $environment): string {
+            $environment .= "\nMONGODB_URI=mongodb://mongodb:27017";
+            $environment .= "\nMONGODB_DATABASE=laravel";
+            return $environment;
+        };
+
+        $this->services['redis']['configuring_env'] = function (string $environment): string {
+            return str_replace('REDIS_HOST=127.0.0.1', 'REDIS_HOST=redis', $environment);
+        };
+
+        $this->services['valkey']['configuring_env'] = function (string $environment): string {
+            return str_replace('REDIS_HOST=127.0.0.1', 'REDIS_HOST=valkey', $environment);
+        };
+
+        $this->services['memcached']['configuring_env'] = function (string $environment): string {
+            return str_replace('MEMCACHED_HOST=127.0.0.1', 'MEMCACHED_HOST=memcached', $environment);
+        };
+
+        $this->services['meilisearch']['configuring_env'] = function (string $environment): string {
+            $environment .= "\nSCOUT_DRIVER=meilisearch";
+            $environment .= "\nMEILISEARCH_HOST=http://meilisearch:7700\n";
+            $environment .= "\nMEILISEARCH_NO_ANALYTICS=false\n";
+            return $environment;
+        };
+
+        $this->services['typesense']['configuring_env'] = function (string $environment): string {
+            $environment .= "\nSCOUT_DRIVER=typesense";
+            $environment .= "\nTYPESENSE_HOST=typesense";
+            $environment .= "\nTYPESENSE_PORT=8108";
+            $environment .= "\nTYPESENSE_PROTOCOL=http";
+            $environment .= "\nTYPESENSE_API_KEY=xyz\n";
+            return $environment;
+        };
+
+        $this->services['mailpit']['configuring_env'] = function (string $environment): string {
+            $environment = preg_replace("/^MAIL_MAILER=(.*)/m", "MAIL_MAILER=smtp", $environment);
+            $environment = preg_replace("/^MAIL_HOST=(.*)/m", "MAIL_HOST=mailpit", $environment);
+            return preg_replace("/^MAIL_PORT=(.*)/m", "MAIL_PORT=1025", $environment);
+        };
+
+        $this->services['soketi']['configuring_env'] = function (string $environment): string {
+            $environment = preg_replace("/^BROADCAST_DRIVER=(.*)/m", "BROADCAST_DRIVER=pusher", $environment);
+            $environment = preg_replace("/^PUSHER_APP_ID=(.*)/m", "PUSHER_APP_ID=app-id", $environment);
+            $environment = preg_replace("/^PUSHER_APP_KEY=(.*)/m", "PUSHER_APP_KEY=app-key", $environment);
+            $environment = preg_replace("/^PUSHER_APP_SECRET=(.*)/m", "PUSHER_APP_SECRET=app-secret", $environment);
+            $environment = preg_replace("/^PUSHER_HOST=(.*)/m", "PUSHER_HOST=soketi", $environment);
+            $environment = preg_replace("/^PUSHER_PORT=(.*)/m", "PUSHER_PORT=6001", $environment);
+            $environment = preg_replace("/^PUSHER_SCHEME=(.*)/m", "PUSHER_SCHEME=http", $environment);
+            return preg_replace("/^VITE_PUSHER_HOST=(.*)/m", "VITE_PUSHER_HOST=localhost", $environment);
+        };
+    }
+
     /**
      * Register a new service with its Docker Compose stub.
      *
@@ -59,19 +156,22 @@ class Services
      * @param string $stubPath
      * @param bool $persistent
      * @param bool|null $default
+     * @param Closure|null $configuringEnv
      * @param Closure|null $afterInstall
      * @return self
      */
-    public function addService(string $service,
-                               string $stubPath,
-                               bool $persistent = false,
-                               ?bool $default = false,
-                               ?Closure $afterInstall = null
-    ): self {
+    public function addService(string   $service,
+                               string   $stubPath,
+                               bool     $persistent = false,
+                               ?bool    $default = false,
+                               ?Closure $configuringEnv = null,
+                               ?Closure $afterInstall = null): self
+    {
         $this->services[$service] = [
             'stub' => $stubPath,
             'persistent' => $persistent,
             'default' => $default,
+            'configuring_env' => $configuringEnv,
             'after_install' => $afterInstall,
         ];
 
@@ -127,9 +227,27 @@ class Services
     }
 
     /**
+     * Execute environment variable hooks for the requested services.
+     *
+     * @param string $environment
+     * @param array $services
+     * @return string
+     */
+    public function replaceEnvVariables(string $environment, array $services): string
+    {
+        foreach ($services as $service) {
+            if (isset($this->services[$service]) && is_array($this->services[$service]) && ($this->services[$service]['configuring_env'] ?? null) !== null) {
+                $environment = $this->services[$service]['configuring_env']($environment);
+            }
+        }
+
+        return $environment;
+    }
+
+    /**
      * Execute hooks for the requested services.
      *
-     * @param mixed $command
+     * @param Command $command
      * @param array $services
      * @return void
      */
