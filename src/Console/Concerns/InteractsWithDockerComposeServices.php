@@ -48,11 +48,14 @@ trait InteractsWithDockerComposeServices
         }
 
         // Adds the new services as dependencies of the laravel.test service...
+        $dependencies = collect($services)->filter(function ($service) {
+            return Sail::isDependedOn($service);
+        })->toArray();
         if (! array_key_exists('laravel.test', $compose['services'])) {
-            $this->warn('Couldn\'t find the laravel.test service. Make sure you add ['.implode(',', $services).'] to the depends_on config.');
+            $this->warn('Couldn\'t find the laravel.test service. Make sure you add ['.implode(',', $dependencies).'] to the depends_on config.');
         } else {
             $compose['services']['laravel.test']['depends_on'] = collect($compose['services']['laravel.test']['depends_on'] ?? [])
-                ->merge($services)
+                ->merge($dependencies)
                 ->unique()
                 ->values()
                 ->all();
