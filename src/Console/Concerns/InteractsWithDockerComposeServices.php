@@ -37,24 +37,29 @@ trait InteractsWithDockerComposeServices
     protected function buildDockerCompose(array $services)
     {
         $composePath = base_path('docker-compose.yml');
+        $appService = 'laravel.test';
 
         $compose = file_exists($composePath)
             ? Yaml::parseFile($composePath)
-            : Yaml::parse(file_get_contents(Sail::baseTemplate()));
+            : Yaml::parse(str_replace(
+                'APP_SERVICE',
+                $appService,
+                file_get_contents(Sail::baseTemplate())
+            ));
 
         // Prepare the installation of the "mariadb-client" package if the MariaDB service is used...
         if (in_array('mariadb', $services)) {
-            $compose['services']['laravel.test']['build']['args']['MYSQL_CLIENT'] = 'mariadb-client';
+            $compose['services'][$appService]['build']['args']['MYSQL_CLIENT'] = 'mariadb-client';
         }
 
-        // Adds the new services as dependencies of the laravel.test service...
+        // Adds the new services as dependencies of the app service...
         $dependencies = collect($services)->filter(function ($service) {
             return Sail::isDependedOn($service);
         })->toArray();
-        if (! array_key_exists('laravel.test', $compose['services'])) {
-            $this->warn('Couldn\'t find the laravel.test service. Make sure you add ['.implode(',', $dependencies).'] to the depends_on config.');
+        if (! array_key_exists($appService, $compose['services'])) {
+            $this->warn('Couldn\'t find the '.$appService.' service. Make sure you add ['.implode(',', $dependencies).'] to the depends_on config.');
         } else {
-            $compose['services']['laravel.test']['depends_on'] = collect($compose['services']['laravel.test']['depends_on'] ?? [])
+            $compose['services'][$appService]['depends_on'] = collect($compose['services'][$appService]['depends_on'] ?? [])
                 ->merge($dependencies)
                 ->unique()
                 ->values()
@@ -147,7 +152,11 @@ trait InteractsWithDockerComposeServices
 
         file_put_contents(
             $this->laravel->basePath('.devcontainer/devcontainer.json'),
-            file_get_contents(__DIR__.'/../../../stubs/devcontainer.stub')
+            str_replace(
+                'APP_SERVICE',
+                'laravel.test',
+                file_get_contents(__DIR__.'/../../../stubs/devcontainer.stub') ?: ''
+            )
         );
 
         $environment = file_get_contents($this->laravel->basePath('.env'));
