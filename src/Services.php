@@ -52,7 +52,19 @@ class Services
         'soketi',
     ];
 
+    /**
+     * Path to the base docker compose template
+     *
+     * @var string
+     */
     protected string $composeStub = __DIR__ . '/../stubs/docker-compose.stub';
+
+    /**
+     * Hooks to be run during the publish command
+     *
+     * @var Closure[]
+     */
+    protected array $afterPublish = [];
 
     public function __construct()
     {
@@ -149,6 +161,33 @@ class Services
             $environment = preg_replace("/^PUSHER_SCHEME=(.*)/m", "PUSHER_SCHEME=http", $environment);
             return preg_replace("/^VITE_PUSHER_HOST=(.*)/m", "VITE_PUSHER_HOST=localhost", $environment);
         };
+
+        $this->afterPublish[] = function (Command $command) {
+            file_put_contents(
+                app()->basePath('docker-compose.yml'),
+                str_replace(
+                    [
+                        './vendor/laravel/sail/runtimes/8.4',
+                        './vendor/laravel/sail/runtimes/8.3',
+                        './vendor/laravel/sail/runtimes/8.2',
+                        './vendor/laravel/sail/runtimes/8.1',
+                        './vendor/laravel/sail/runtimes/8.0',
+                        './vendor/laravel/sail/database/mysql',
+                        './vendor/laravel/sail/database/pgsql'
+                    ],
+                    [
+                        './docker/8.4',
+                        './docker/8.3',
+                        './docker/8.2',
+                        './docker/8.1',
+                        './docker/8.0',
+                        './docker/mysql',
+                        './docker/pgsql'
+                    ],
+                    file_get_contents(app()->basePath('docker-compose.yml'))
+                )
+            );
+        };
     }
 
     /**
@@ -202,6 +241,19 @@ class Services
             'configuring_env' => $configuringEnv,
             'after_install' => $afterInstall,
         ];
+
+        return $this;
+    }
+
+    /**
+     * Add a hook to the pipeline executed during the publish command.
+     *
+     * @param Closure $closure
+     * @return $this
+     */
+    public function registerPublishHook(Closure $closure): self
+    {
+        $this->afterPublish[] = $closure;
 
         return $this;
     }
@@ -290,12 +342,25 @@ class Services
      * @param array $services
      * @return void
      */
-    public function runHooks(Command $command, array $services): void
+    public function runInstallHooks(Command $command, array $services): void
     {
         foreach ($services as $service) {
             if (isset($this->services[$service]) && is_array($this->services[$service]) && ($this->services[$service]['after_install'] ?? null) !== null) {
                 $this->services[$service]['after_install']($command, $services);
             }
+        }
+    }
+
+    /**
+     * Execute hooks set for the publish command
+     *
+     * @param Command $command
+     * @return void
+     */
+    public function runPublishHooks(Command $command): void
+    {
+        foreach ($this->afterPublish as $hook) {
+            $hook($command);
         }
     }
 }
