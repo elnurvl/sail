@@ -79,6 +79,19 @@ trait InteractsWithDockerComposeServices
                 }
             });
 
+        // Merge networks
+        $compose['networks'] = collect(Sail::networks())->merge($compose['networks'] ?? [])->toArray();
+
+        foreach ($compose['networks'] as $name => $network) {
+            if ($network['external'] ?? false) {
+                exec("docker network ls --filter name=^" . escapeshellarg($name) . "$ -q", $check);
+                if (empty($check)) {
+                    exec("docker network create ".escapeshellarg($name), $output);
+                    $this->components->info("$name network has been created.");
+                }
+            }
+        }
+
         // Merge volumes...
         collect($services)
             ->filter(function ($service) {

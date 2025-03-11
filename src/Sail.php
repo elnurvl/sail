@@ -8,10 +8,12 @@ use Illuminate\Support\Facades\Facade;
 /**
  * @method static self setBaseTemplate(string $stub)
  * @method static self addService(string $service, ?string $stubPath = null, ?bool $persistent = null, ?bool $default = null, ?bool $dependency = null, ?Closure $configuringEnv = null, ?Closure $afterInstall = null)
+ * @method static self addNetwork(array $network)
  * @method static self registerInstallHook(Closure $closure)
  * @method static self registerPublishHook(Closure $closure)
  * @method static string baseTemplate()
  * @method static array availableServices(bool $default = false)
+ * @method static array networks()
  * @method static string stub(string $service)
  * @method static bool isPersistent(string $service)
  * @method static bool isDependedOn(string $service)

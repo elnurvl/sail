@@ -53,6 +53,17 @@ class Services
     ];
 
     /**
+     * The networks services communicating on
+     *
+     * @var array<string, array<string, string|bool>>
+     */
+    protected array $networks = [
+        'sail' => [
+            'driver' => 'bridge',
+        ]
+    ];
+
+    /**
      * Path to the base docker compose template
      *
      * @var string
@@ -253,6 +264,17 @@ class Services
     }
 
     /**
+     * @param array<string, string|bool> $network
+     * @return $this
+     */
+    public function addNetwork(array $network): self
+    {
+        $this->networks = array_merge($this->networks, $network);
+
+        return $this;
+    }
+
+    /**
      * Add a hook to the pipeline executed during the installation command.
      *
      * @param Closure $closure
@@ -302,6 +324,16 @@ class Services
         }
 
         return $services;
+    }
+
+    /**
+     * Get the list of networks defined for the docker-compose file
+     *
+     * @return array
+     */
+    public function networks(): array
+    {
+        return $this->networks;
     }
 
     /**
