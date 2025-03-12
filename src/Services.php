@@ -4,13 +4,14 @@ namespace Laravel\Sail;
 
 use Closure;
 use Illuminate\Console\Command;
+use Illuminate\Support\Str;
 
 class Services
 {
     /**
      * The services registered with their stubs, persistence, and callbacks.
      *
-     * @var array<int|string, string|array{stub: ?string, persistent: ?bool, default: ?bool, dependency: ?bool, env: ?Closure, callback: ?Closure}>
+     * @var array<int|string, string|array{stub: ?string, persistent: ?bool, default: ?bool, dependency: ?bool, env: array<string, string>|Closure|null, callback: ?Closure}>
      */
     protected array $services = [
         'mysql' => [
@@ -25,31 +26,73 @@ class Services
         ],
         'mongodb' => [
             'persistent' => true,
+            'env' => [
+                'MONGODB_URI' => 'mongodb://mongodb:27017',
+                'MONGODB_DATABASE' => 'laravel',
+            ],
         ],
         'redis' => [
             'persistent' => true,
             'default' => true,
+            'env' => [
+                'REDIS_HOST' => 'redis',
+            ],
         ],
         'valkey' => [
             'persistent' => true,
+            'env' => [
+                'REDIS_HOST' => 'valkey',
+            ],
         ],
-        'memcached',
+        'memcached' => [
+            'env' => [
+                'MEMCACHED_HOST' => 'memcached',
+            ],
+        ],
         'meilisearch' => [
             'persistent' => true,
+            'env' => [
+                'SCOUT_DRIVER' => 'meilisearch',
+                'MEILISEARCH_HOST' => 'http://meilisearch:7700',
+                'MEILISEARCH_NO_ANALYTICS' => 'false',
+            ],
         ],
         'typesense' => [
             'persistent' => true,
+            'env' => [
+                'SCOUT_DRIVER' => 'typesense',
+                'TYPESENSE_HOST' => 'typesense',
+                'TYPESENSE_PORT' => '8108',
+                'TYPESENSE_PROTOCOL' => 'http',
+                'TYPESENSE_API_KEY' => 'xyz',
+            ],
         ],
         'minio' => [
             'persistent' => true,
         ],
         'mailpit' => [
             'default' => true,
+            'env' => [
+                'MAIL_MAILER' => 'smtp',
+                'MAIL_HOST' => 'mailpit',
+                'MAIL_PORT' => '1025',
+            ],
         ],
         'selenium' => [
             'default' => true,
         ],
-        'soketi',
+        'soketi' => [
+            'env' => [
+                'BROADCAST_DRIVER' => 'pusher',
+                'PUSHER_APP_ID' => 'app-id',
+                'PUSHER_APP_KEY' => 'app-key',
+                'PUSHER_APP_SECRET' => 'app-secret',
+                'PUSHER_HOST' => 'soketi',
+                'PUSHER_PORT' => '6001',
+                'PUSHER_SCHEME' => 'http',
+                'VITE_PUSHER_HOST' => 'localhost',
+            ],
+        ],
     ];
 
     /**
@@ -128,84 +171,6 @@ class Services
             $environment = str_replace('DB_HOST=127.0.0.1', "DB_HOST=mariadb", $environment);
             return $setDbCredentials($environment);
         };
-
-        $this->services['mongodb']['env'] = function (string $environment): string {
-            $environment .= "\nMONGODB_URI=mongodb://mongodb:27017";
-            $environment .= "\nMONGODB_DATABASE=laravel";
-            return $environment;
-        };
-
-        $this->services['redis']['env'] = function (string $environment): string {
-            return str_replace('REDIS_HOST=127.0.0.1', 'REDIS_HOST=redis', $environment);
-        };
-
-        $this->services['valkey']['env'] = function (string $environment): string {
-            return str_replace('REDIS_HOST=127.0.0.1', 'REDIS_HOST=valkey', $environment);
-        };
-
-        $this->services['memcached']['env'] = function (string $environment): string {
-            return str_replace('MEMCACHED_HOST=127.0.0.1', 'MEMCACHED_HOST=memcached', $environment);
-        };
-
-        $this->services['meilisearch']['env'] = function (string $environment): string {
-            $environment .= "\nSCOUT_DRIVER=meilisearch";
-            $environment .= "\nMEILISEARCH_HOST=http://meilisearch:7700\n";
-            $environment .= "\nMEILISEARCH_NO_ANALYTICS=false\n";
-            return $environment;
-        };
-
-        $this->services['typesense']['env'] = function (string $environment): string {
-            $environment .= "\nSCOUT_DRIVER=typesense";
-            $environment .= "\nTYPESENSE_HOST=typesense";
-            $environment .= "\nTYPESENSE_PORT=8108";
-            $environment .= "\nTYPESENSE_PROTOCOL=http";
-            $environment .= "\nTYPESENSE_API_KEY=xyz\n";
-            return $environment;
-        };
-
-        $this->services['mailpit']['env'] = function (string $environment): string {
-            $environment = preg_replace("/^MAIL_MAILER=(.*)/m", "MAIL_MAILER=smtp", $environment);
-            $environment = preg_replace("/^MAIL_HOST=(.*)/m", "MAIL_HOST=mailpit", $environment);
-            return preg_replace("/^MAIL_PORT=(.*)/m", "MAIL_PORT=1025", $environment);
-        };
-
-        $this->services['soketi']['env'] = function (string $environment): string {
-            $environment = preg_replace("/^BROADCAST_DRIVER=(.*)/m", "BROADCAST_DRIVER=pusher", $environment);
-            $environment = preg_replace("/^PUSHER_APP_ID=(.*)/m", "PUSHER_APP_ID=app-id", $environment);
-            $environment = preg_replace("/^PUSHER_APP_KEY=(.*)/m", "PUSHER_APP_KEY=app-key", $environment);
-            $environment = preg_replace("/^PUSHER_APP_SECRET=(.*)/m", "PUSHER_APP_SECRET=app-secret", $environment);
-            $environment = preg_replace("/^PUSHER_HOST=(.*)/m", "PUSHER_HOST=soketi", $environment);
-            $environment = preg_replace("/^PUSHER_PORT=(.*)/m", "PUSHER_PORT=6001", $environment);
-            $environment = preg_replace("/^PUSHER_SCHEME=(.*)/m", "PUSHER_SCHEME=http", $environment);
-            return preg_replace("/^VITE_PUSHER_HOST=(.*)/m", "VITE_PUSHER_HOST=localhost", $environment);
-        };
-
-        $this->postPublishCallbacks[] = function (Command $command) {
-            file_put_contents(
-                app()->basePath('docker-compose.yml'),
-                str_replace(
-                    [
-                        './vendor/laravel/sail/runtimes/8.4',
-                        './vendor/laravel/sail/runtimes/8.3',
-                        './vendor/laravel/sail/runtimes/8.2',
-                        './vendor/laravel/sail/runtimes/8.1',
-                        './vendor/laravel/sail/runtimes/8.0',
-                        './vendor/laravel/sail/database/mysql',
-                        './vendor/laravel/sail/database/pgsql'
-                    ],
-                    [
-                        './docker/8.4',
-                        './docker/8.3',
-                        './docker/8.2',
-                        './docker/8.1',
-                        './docker/8.0',
-                        './docker/mysql',
-                        './docker/pgsql'
-                    ],
-                    file_get_contents(app()->basePath('docker-compose.yml'))
-                )
-            );
-        };
     }
 
     /**
@@ -239,7 +204,7 @@ class Services
      * @param bool|null $isPersistent
      * @param bool|null $isDefault
      * @param bool|null $isDependency
-     * @param Closure|null $env
+     * @param array<string, string>|Closure|null $env
      * @param Closure|null $preInstallCallback
      * @return self
      */
@@ -248,7 +213,7 @@ class Services
                                ?bool    $isPersistent = null,
                                ?bool    $isDefault = null,
                                ?bool    $isDependency = null,
-                               ?Closure $env = null,
+                               array|Closure|null $env = null,
                                ?Closure $preInstallCallback = null): self
     {
         $this->services[$service] = [
@@ -379,12 +344,45 @@ class Services
     public function configureEnv(string $environment, array $services): string
     {
         foreach ($services as $service) {
-            if (isset($this->services[$service]) && is_array($this->services[$service]) && ($this->services[$service]['env'] ?? null) !== null) {
-                $environment = $this->services[$service]['env']($environment);
+            if (!isset($this->services[$service]) || !is_array($this->services[$service])) {
+                continue;
+            }
+
+            $envConfig = $this->services[$service]['env'] ?? null;
+
+            if ($envConfig instanceof Closure) {
+                $environment = $envConfig($environment);
+                continue;
+            }
+
+            if (!is_array($envConfig)) {
+                continue;
+            }
+
+            $lines = Str::of($environment)->rtrim()->explode("\n")->all();
+            $newGroups = [];
+
+            foreach ($envConfig as $key => $value) {
+                $line = "$key=$value";
+                $prefix = strtok($key, '_');
+
+                if (Str::contains($environment, "$key=")) {
+                    $lines = collect($lines)->map(fn($l) => Str::startsWith($l, "$key=") ? $line : $l)->all();
+                } elseif (collect($lines)->first(fn($l) => Str::startsWith($l, "$prefix"))) {
+                    $pos = collect($lines)->search(fn($l) => Str::startsWith($l, "$prefix")) + 1;
+                    array_splice($lines, $pos, 0, $line);
+                } else {
+                    $newGroups[$prefix][] = $line;
+                }
+            }
+
+            $environment = implode("\n", $lines);
+            if ($newGroups) {
+                $environment .= "\n\n" . collect($newGroups)->flatten()->implode("\n") . "\n";
             }
         }
 
-        return $environment;
+        return rtrim($environment);
     }
 
     /**
