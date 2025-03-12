@@ -3,6 +3,7 @@
 namespace Laravel\Sail\Console;
 
 use Illuminate\Console\Command;
+use Laravel\Sail\Sail;
 use Laravel\Sail\Console\Concerns\InteractsWithDockerComposeServices;
 use Symfony\Component\Console\Attribute\AsCommand;
 
@@ -34,15 +35,17 @@ class AddCommand extends Command
      */
     public function handle()
     {
+        $availableServices = Sail::availableServices();
+
         if ($this->argument('services')) {
             $services = $this->argument('services') == 'none' ? [] : explode(',', $this->argument('services'));
         } elseif ($this->option('no-interaction')) {
-            $services = $this->defaultServices;
+            $services = Sail::availableServices(true);
         } else {
             $services = $this->gatherServicesInteractively();
         }
 
-        if ($invalidServices = array_diff($services, $this->services)) {
+        if ($invalidServices = array_diff($services, $availableServices)) {
             $this->components->error('Invalid services ['.implode(',', $invalidServices).'].');
 
             return 1;
@@ -51,6 +54,8 @@ class AddCommand extends Command
         $this->buildDockerCompose($services);
         $this->replaceEnvVariables($services);
         $this->configurePhpUnit();
+
+        Sail::runPreInstallCallbacks($this, $services);
 
         $this->prepareInstallation($services);
 

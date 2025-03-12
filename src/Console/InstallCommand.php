@@ -3,14 +3,14 @@
 namespace Laravel\Sail\Console;
 
 use Illuminate\Console\Command;
-use RuntimeException;
+use Laravel\Sail\Sail;
+use Laravel\Sail\Console\Concerns\InteractsWithDockerComposeServices;
 use Symfony\Component\Console\Attribute\AsCommand;
-use Symfony\Component\Process\Process;
 
 #[AsCommand(name: 'sail:install')]
 class InstallCommand extends Command
 {
-    use Concerns\InteractsWithDockerComposeServices;
+    use InteractsWithDockerComposeServices;
 
     /**
      * The name and signature of the console command.
@@ -36,15 +36,17 @@ class InstallCommand extends Command
      */
     public function handle()
     {
+        $availableServices = Sail::availableServices();
+
         if ($this->option('with')) {
             $services = $this->option('with') == 'none' ? [] : explode(',', $this->option('with'));
         } elseif ($this->option('no-interaction')) {
-            $services = $this->defaultServices;
+            $services = Sail::availableServices(true);
         } else {
             $services = $this->gatherServicesInteractively();
         }
 
-        if ($invalidServices = array_diff($services, $this->services)) {
+        if ($invalidServices = array_diff($services, $availableServices)) {
             $this->components->error('Invalid services ['.implode(',', $invalidServices).'].');
 
             return 1;
@@ -57,6 +59,8 @@ class InstallCommand extends Command
         if ($this->option('devcontainer')) {
             $this->installDevContainer();
         }
+
+        Sail::runPreInstallCallbacks($this, $services);
 
         $this->prepareInstallation($services);
 
