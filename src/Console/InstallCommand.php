@@ -56,7 +56,7 @@ class InstallCommand extends Command
         $this->replaceEnvVariables($services);
         $this->configurePhpUnit();
 
-        Sail::runInstallHooks($this, $services);
+        Sail::runPreInstallCallbacks($this, $services);
 
         if ($this->option('devcontainer')) {
             $this->installDevContainer();

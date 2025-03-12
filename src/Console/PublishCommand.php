@@ -33,6 +33,6 @@ class PublishCommand extends Command
         $this->call('vendor:publish', ['--tag' => 'sail-docker']);
         $this->call('vendor:publish', ['--tag' => 'sail-database']);
 
-        Sail::runPublishHooks($this);
+        Sail::runPostPublishCallbacks($this);
     }
 }

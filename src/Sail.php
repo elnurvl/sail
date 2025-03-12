@@ -7,19 +7,19 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @method static self setBaseTemplate(string $stub)
- * @method static self addService(string $service, ?string $stubPath = null, ?bool $persistent = null, ?bool $default = null, ?bool $dependency = null, ?Closure $configuringEnv = null, ?Closure $afterInstall = null)
+ * @method static self addService(string $service, ?string $stub = null, ?bool $isPersistent = null, ?bool $isDefault = null, ?bool $isDependency = null, ?Closure $env = null, ?Closure $preInstallCallback = null)
  * @method static self addNetwork(array $network)
- * @method static self registerInstallHook(Closure $closure)
- * @method static self registerPublishHook(Closure $closure)
+ * @method static self addPreInstallCallback(Closure $closure)
+ * @method static self addPostPublishCallback(Closure $closure)
  * @method static string baseTemplate()
- * @method static array availableServices(bool $default = false)
+ * @method static array availableServices(bool $isDefault = false)
  * @method static array networks()
  * @method static string stub(string $service)
  * @method static bool isPersistent(string $service)
- * @method static bool isDependedOn(string $service)
- * @method static string replaceEnvVariables(string $environment, array $services)
- * @method static void runInstallHooks(mixed $command, array $services, string $appService = 'laravel.test')
- * @method static void runPublishHooks(mixed $command)
+ * @method static bool isDependency(string $service)
+ * @method static string configureEnv(string $environment, array $services)
+ * @method static self runPreInstallCallbacks(mixed $command, array $services, string $appService = 'laravel.test')
+ * @method static self runPostPublishCallbacks(mixed $command)
  */
 class Sail extends Facade
 {

@@ -8,9 +8,9 @@ use Illuminate\Console\Command;
 class Services
 {
     /**
-     * The services registered with their stubs, persistence, and hooks.
+     * The services registered with their stubs, persistence, and callbacks.
      *
-     * @var array<int|string, string|array{stub: ?string, persistent: ?bool, default: ?bool, dependency: ?bool, configuring_env: ?Closure, after_install: ?Closure}>
+     * @var array<int|string, string|array{stub: ?string, persistent: ?bool, default: ?bool, dependency: ?bool, env: ?Closure, callback: ?Closure}>
      */
     protected array $services = [
         'mysql' => [
@@ -71,18 +71,18 @@ class Services
     protected string $composeStub = __DIR__ . '/../stubs/docker-compose.stub';
 
     /**
-     * Hooks to be run after all services are configured
+     * Callbacks to be run after all services are configured
      *
      * @var Closure[]
      */
-    protected array $afterInstall = [];
+    protected array $preInstallCallbacks = [];
 
     /**
-     * Hooks to be run during the publish command
+     * Callbacks to be run during the publish command
      *
      * @var Closure[]
      */
-    protected array $afterPublish = [];
+    protected array $postPublishCallbacks = [];
 
     public function __construct()
     {
@@ -105,14 +105,14 @@ class Services
             return preg_replace("/DB_PASSWORD=(.*)/", "DB_PASSWORD=password", $environment);
         };
 
-        $this->services['mysql']['configuring_env'] = function (string $environment) use ($uncommentDbVars, $setDbCredentials): string {
+        $this->services['mysql']['env'] = function (string $environment) use ($uncommentDbVars, $setDbCredentials): string {
             $environment = $uncommentDbVars($environment);
             $environment = preg_replace('/DB_CONNECTION=.*/', 'DB_CONNECTION=mysql', $environment);
             $environment = str_replace('DB_HOST=127.0.0.1', "DB_HOST=mysql", $environment);
             return $setDbCredentials($environment);
         };
 
-        $this->services['pgsql']['configuring_env'] = function (string $environment) use ($uncommentDbVars, $setDbCredentials): string {
+        $this->services['pgsql']['env'] = function (string $environment) use ($uncommentDbVars, $setDbCredentials): string {
             $environment = $uncommentDbVars($environment);
             $environment = preg_replace('/DB_CONNECTION=.*/', 'DB_CONNECTION=pgsql', $environment);
             $environment = str_replace('DB_HOST=127.0.0.1', "DB_HOST=pgsql", $environment);
@@ -120,7 +120,7 @@ class Services
             return $setDbCredentials($environment);
         };
 
-        $this->services['mariadb']['configuring_env'] = function (string $environment) use ($uncommentDbVars, $setDbCredentials): string {
+        $this->services['mariadb']['env'] = function (string $environment) use ($uncommentDbVars, $setDbCredentials): string {
             $environment = $uncommentDbVars($environment);
             if (config()->has('database.connections.mariadb')) {
                 $environment = preg_replace('/DB_CONNECTION=.*/', 'DB_CONNECTION=mariadb', $environment);
@@ -129,32 +129,32 @@ class Services
             return $setDbCredentials($environment);
         };
 
-        $this->services['mongodb']['configuring_env'] = function (string $environment): string {
+        $this->services['mongodb']['env'] = function (string $environment): string {
             $environment .= "\nMONGODB_URI=mongodb://mongodb:27017";
             $environment .= "\nMONGODB_DATABASE=laravel";
             return $environment;
         };
 
-        $this->services['redis']['configuring_env'] = function (string $environment): string {
+        $this->services['redis']['env'] = function (string $environment): string {
             return str_replace('REDIS_HOST=127.0.0.1', 'REDIS_HOST=redis', $environment);
         };
 
-        $this->services['valkey']['configuring_env'] = function (string $environment): string {
+        $this->services['valkey']['env'] = function (string $environment): string {
             return str_replace('REDIS_HOST=127.0.0.1', 'REDIS_HOST=valkey', $environment);
         };
 
-        $this->services['memcached']['configuring_env'] = function (string $environment): string {
+        $this->services['memcached']['env'] = function (string $environment): string {
             return str_replace('MEMCACHED_HOST=127.0.0.1', 'MEMCACHED_HOST=memcached', $environment);
         };
 
-        $this->services['meilisearch']['configuring_env'] = function (string $environment): string {
+        $this->services['meilisearch']['env'] = function (string $environment): string {
             $environment .= "\nSCOUT_DRIVER=meilisearch";
             $environment .= "\nMEILISEARCH_HOST=http://meilisearch:7700\n";
             $environment .= "\nMEILISEARCH_NO_ANALYTICS=false\n";
             return $environment;
         };
 
-        $this->services['typesense']['configuring_env'] = function (string $environment): string {
+        $this->services['typesense']['env'] = function (string $environment): string {
             $environment .= "\nSCOUT_DRIVER=typesense";
             $environment .= "\nTYPESENSE_HOST=typesense";
             $environment .= "\nTYPESENSE_PORT=8108";
@@ -163,13 +163,13 @@ class Services
             return $environment;
         };
 
-        $this->services['mailpit']['configuring_env'] = function (string $environment): string {
+        $this->services['mailpit']['env'] = function (string $environment): string {
             $environment = preg_replace("/^MAIL_MAILER=(.*)/m", "MAIL_MAILER=smtp", $environment);
             $environment = preg_replace("/^MAIL_HOST=(.*)/m", "MAIL_HOST=mailpit", $environment);
             return preg_replace("/^MAIL_PORT=(.*)/m", "MAIL_PORT=1025", $environment);
         };
 
-        $this->services['soketi']['configuring_env'] = function (string $environment): string {
+        $this->services['soketi']['env'] = function (string $environment): string {
             $environment = preg_replace("/^BROADCAST_DRIVER=(.*)/m", "BROADCAST_DRIVER=pusher", $environment);
             $environment = preg_replace("/^PUSHER_APP_ID=(.*)/m", "PUSHER_APP_ID=app-id", $environment);
             $environment = preg_replace("/^PUSHER_APP_KEY=(.*)/m", "PUSHER_APP_KEY=app-key", $environment);
@@ -180,7 +180,7 @@ class Services
             return preg_replace("/^VITE_PUSHER_HOST=(.*)/m", "VITE_PUSHER_HOST=localhost", $environment);
         };
 
-        $this->afterPublish[] = function (Command $command) {
+        $this->postPublishCallbacks[] = function (Command $command) {
             file_put_contents(
                 app()->basePath('docker-compose.yml'),
                 str_replace(
@@ -235,29 +235,29 @@ class Services
      * Register a new service with its Docker Compose stub.
      *
      * @param string $service
-     * @param string|null $stubPath
-     * @param bool|null $persistent
-     * @param bool|null $default
-     * @param bool|null $dependency
-     * @param Closure|null $configuringEnv
-     * @param Closure|null $afterInstall
+     * @param string|null $stub
+     * @param bool|null $isPersistent
+     * @param bool|null $isDefault
+     * @param bool|null $isDependency
+     * @param Closure|null $env
+     * @param Closure|null $preInstallCallback
      * @return self
      */
     public function addService(string   $service,
-                               ?string   $stubPath = null,
-                               ?bool     $persistent = null,
-                               ?bool     $default = null,
-                               ?bool     $dependency = null,
-                               ?Closure $configuringEnv = null,
-                               ?Closure $afterInstall = null): self
+                               ?string  $stub = null,
+                               ?bool    $isPersistent = null,
+                               ?bool    $isDefault = null,
+                               ?bool    $isDependency = null,
+                               ?Closure $env = null,
+                               ?Closure $preInstallCallback = null): self
     {
         $this->services[$service] = [
-            'stub' => $stubPath ?? $this->services[$service]['stub'] ?? null,
-            'persistent' => $persistent ?? $this->services[$service]['persistent'] ?? null,
-            'default' => $default ?? $this->services[$service]['default'] ?? null,
-            'dependency' => $dependency ?? $this->services[$service]['dependency'] ?? null,
-            'configuring_env' => $configuringEnv ?? $this->services[$service]['configuring_env'] ?? null,
-            'after_install' => $afterInstall ?? $this->services[$service]['after_install'] ?? null,
+            'stub' => $stub ?? $this->services[$service]['stub'] ?? null,
+            'persistent' => $isPersistent ?? $this->services[$service]['persistent'] ?? null,
+            'default' => $isDefault ?? $this->services[$service]['default'] ?? null,
+            'dependency' => $isDependency ?? $this->services[$service]['dependency'] ?? null,
+            'env' => $env ?? $this->services[$service]['env'] ?? null,
+            'callback' => $preInstallCallback ?? $this->services[$service]['callback'] ?? null,
         ];
 
         return $this;
@@ -275,27 +275,27 @@ class Services
     }
 
     /**
-     * Add a hook to the pipeline executed during the installation command.
+     * Add a callback to the pipeline executed during the installation command.
      *
-     * @param Closure $closure
+     * @param Closure $callback
      * @return $this
      */
-    public function registerInstallHook(Closure $closure): self
+    public function addPreInstallCallback(Closure $callback): self
     {
-        $this->afterInstall[] = $closure;
+        $this->preInstallCallbacks[] = $callback;
 
         return $this;
     }
 
     /**
-     * Add a hook to the pipeline executed during the publish command.
+     * Add a callback to the pipeline executed during the publish command.
      *
-     * @param Closure $closure
+     * @param Closure $callback
      * @return $this
      */
-    public function registerPublishHook(Closure $closure): self
+    public function addPostPublishCallback(Closure $callback): self
     {
-        $this->afterPublish[] = $closure;
+        $this->postPublishCallbacks[] = $callback;
 
         return $this;
     }
@@ -303,17 +303,17 @@ class Services
     /**
      * Get all available services, including defaults.
      *
-     * @param bool $default If true, returns only default services
+     * @param bool $isDefault If true, returns only default services
      * @return array
      */
-    public function availableServices(bool $default = false): array
+    public function availableServices(bool $isDefault = false): array
     {
         $services = [];
         foreach ($this->services as $key => $value) {
             $services[] = is_string($value) ? $value : $key;
         }
 
-        if ($default) {
+        if ($isDefault) {
             $defaults = [];
             foreach ($this->services as $key => $value) {
                 if (is_array($value) && ($value['default'] ?? false)) {
@@ -364,23 +364,23 @@ class Services
      * @param string $service
      * @return bool
      */
-    public function isDependedOn(string $service): bool
+    public function isDependency(string $service): bool
     {
         return $this->services[$service]['dependency'] ?? true;
     }
 
     /**
-     * Execute environment variable hooks for the requested services.
+     * Add or replace environment variables.
      *
      * @param string $environment
      * @param array $services
      * @return string
      */
-    public function replaceEnvVariables(string $environment, array $services): string
+    public function configureEnv(string $environment, array $services): string
     {
         foreach ($services as $service) {
-            if (isset($this->services[$service]) && is_array($this->services[$service]) && ($this->services[$service]['configuring_env'] ?? null) !== null) {
-                $environment = $this->services[$service]['configuring_env']($environment);
+            if (isset($this->services[$service]) && is_array($this->services[$service]) && ($this->services[$service]['env'] ?? null) !== null) {
+                $environment = $this->services[$service]['env']($environment);
             }
         }
 
@@ -388,35 +388,39 @@ class Services
     }
 
     /**
-     * Execute hooks set for the installation command.
+     * Execute callbacks set for the installation command.
      *
      * @param Command $command
      * @param array $services
      * @param string $appService
-     * @return void
+     * @return $this
      */
-    public function runInstallHooks(Command $command, array $services, string $appService = 'laravel.test'): void
+    public function runPreInstallCallbacks(Command $command, array $services, string $appService = 'laravel.test'): self
     {
         foreach ($services as $service) {
-            if (isset($this->services[$service]) && is_array($this->services[$service]) && ($this->services[$service]['after_install'] ?? null) !== null) {
-                $this->services[$service]['after_install']($command, $services, $appService);
+            if (isset($this->services[$service]) && is_array($this->services[$service]) && ($this->services[$service]['callback'] ?? null) !== null) {
+                $this->services[$service]['callback']($command, $services, $appService);
             }
         }
-        foreach ($this->afterInstall as $hook) {
-            $hook($command, $services, $appService);
+        foreach ($this->preInstallCallbacks as $callback) {
+            $callback($command, $services, $appService);
         }
+
+        return $this;
     }
 
     /**
-     * Execute hooks set for the publish command
+     * Execute callbacks set for the publish command
      *
      * @param Command $command
-     * @return void
+     * @return $this
      */
-    public function runPublishHooks(Command $command): void
+    public function runPostPublishCallbacks(Command $command): self
     {
-        foreach ($this->afterPublish as $hook) {
-            $hook($command);
+        foreach ($this->postPublishCallbacks as $callback) {
+            $callback($command);
         }
+
+        return $this;
     }
 }

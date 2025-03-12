@@ -54,7 +54,7 @@ trait InteractsWithDockerComposeServices
 
         // Adds the new services as dependencies of the app service...
         $dependencies = collect($services)->filter(function ($service) {
-            return Sail::isDependedOn($service);
+            return Sail::isDependency($service);
         })->toArray();
         if (! array_key_exists($appService, $compose['services'])) {
             $this->warn('Couldn\'t find the '.$appService.' service. Make sure you add ['.implode(',', $dependencies).'] to the depends_on config.');
@@ -124,7 +124,7 @@ trait InteractsWithDockerComposeServices
     {
         $environment = file_get_contents($this->laravel->basePath('.env'));
 
-        $environment = Sail::replaceEnvVariables($environment, $services);
+        $environment = Sail::configureEnv($environment, $services);
 
         file_put_contents($this->laravel->basePath('.env'), $environment);
     }
