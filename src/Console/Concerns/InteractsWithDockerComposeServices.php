@@ -39,13 +39,21 @@ trait InteractsWithDockerComposeServices
         $composePath = base_path('docker-compose.yml');
         $appService = 'laravel.test';
 
-        $compose = file_exists($composePath)
-            ? Yaml::parseFile($composePath)
-            : Yaml::parse(str_replace(
-                'APP_SERVICE',
-                $appService,
-                file_get_contents(Sail::baseTemplate())
-            ));
+        if (file_exists($composePath)) {
+            $compose = Yaml::parseFile($composePath);
+        } else {
+            $template = str_replace(
+                '{{APP}}:',
+                $appService.':',
+                file_get_contents(Sail::baseTemplate()),
+                $count
+            );
+            if ($count === 0) {
+                $this->error('Missing app service in the base template. Make sure you have it with the {{APP}} placeholder.');
+                exit(1);
+            }
+            $compose = Yaml::parse($template);
+        }
 
         // Prepare the installation of the "mariadb-client" package if the MariaDB service is used...
         if (in_array('mariadb', $services)) {
@@ -166,7 +174,7 @@ trait InteractsWithDockerComposeServices
         file_put_contents(
             $this->laravel->basePath('.devcontainer/devcontainer.json'),
             str_replace(
-                'APP_SERVICE',
+                '{{APP}}',
                 'laravel.test',
                 file_get_contents(__DIR__.'/../../../stubs/devcontainer.stub') ?: ''
             )
