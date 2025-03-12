@@ -174,7 +174,7 @@ class Services
     }
 
     /**
-     * Set the base Docker Compose template containing a php service named as 'APP_SERVICE'
+     * Set the base Docker Compose template containing a php service named as '{{APP}}'
      *
      * @param string $stub Path to the base Docker Compose stub
      * @return $this
@@ -324,7 +324,7 @@ class Services
     }
 
     /**
-     * Check if a service is required by APP_SERVICE
+     * Check if a service is required by {{APP}} service
      *
      * @param string $service
      * @return bool
