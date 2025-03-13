@@ -43,8 +43,8 @@ trait InteractsWithDockerComposeServices
             $compose = Yaml::parseFile($composePath);
         } else {
             $template = str_replace(
-                '{{APP}}:',
-                $appService.':',
+                '{{APP}}',
+                $appService,
                 file_get_contents(Sail::baseTemplate()),
                 $count
             );
