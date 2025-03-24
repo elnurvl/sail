@@ -11,7 +11,7 @@ class Services
     /**
      * The services registered with their stubs, persistence, and callbacks.
      *
-     * @var array<int|string, string|array{stub: ?string, persistent: ?bool, default: ?bool, dependency: ?bool, env: array<string, string>|Closure|null, callback: ?Closure}>
+     * @var array<int|string, string|array{stub?: string, persistent?: bool, default?: bool, dependency?: bool, env?: array<string, string>|Closure, callback?: Closure}>
      */
     protected array $services = [
         'mysql' => [

@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @method static self setBaseTemplate(string $stub)
- * @method static self addService(string $service, ?string $stub = null, ?bool $isPersistent = null, ?bool $isDefault = null, ?bool $isDependency = null, ?Closure $env = null, ?Closure $preInstallCallback = null)
+ * @method static self addService(string $service, ?string $stub = null, ?bool $isPersistent = null, ?bool $isDefault = null, ?bool $isDependency = null, array|Closure|null $env = null, ?Closure $preInstallCallback = null)
  * @method static self addNetwork(array $network)
  * @method static self addPreInstallCallback(Closure $closure)
  * @method static self addPostPublishCallback(Closure $closure)
