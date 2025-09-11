@@ -1,5 +1,5 @@
 {
-    "name": "laravel/sail",
+    "name": "elnurvl/sail",
     "description": "Docker files for running a basic Laravel application.",
     "keywords": ["laravel", "docker"],
     "license": "MIT",
